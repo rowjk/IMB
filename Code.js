@@ -16,7 +16,7 @@
 // ==========================================
 const CONFIG = {
   // 1. Discord Webhook (請填入您的 Webhook URL)
-  discordUrl: 'https://discord.com/api/webhooks/1451493502663000168/uKRMMIfPV5ZS_tBsGzxXjJLjrQXtfs051UZt1ZW5FVP2BXPuOcUFktAIsG_gTeilJ-Zi', 
+  discordUrl: 'YOUR_DISCORD_WEBHOOK_URL', 
   
   // 2. Google Sheet 設定
   sheetName: 'Discord_Bot',
@@ -26,7 +26,7 @@ const CONFIG = {
   cooldownSeconds: 1800,                 // 防連發冷卻 (秒)
   
   // 4. Web App 安全設定
-  webAppKey: '10083abc', // ★ 請自行設定遙控密碼
+  webAppKey: 'OUR_SECRET_KEY', // ★ 請自行設定遙控密碼
   // ★ 若自動抓取失敗，請在此填入您的 Web App 網址 (https://script.google.com/macros/s/.../exec)
   manualWebAppUrl: 'https://script.google.com/macros/s/AKfycbxxVKPlU6rJFD8E6WcnZlEW2uLnaLm5voFpMz3G_8kgW2bY8oawa3dAPJtTkJctHT2Lgg/exec', 
   

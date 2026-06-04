@@ -65,27 +65,6 @@ graph TD
 
 ---
 
-## 🔑 安全設定與環境變數
-
-本系統使用 Google Apps Script 的「指令碼屬性」存放敏感金鑰，確保程式碼上傳至 Git 時不會洩漏：
-
-### 1. 新增指令碼屬性
-1. 在 Google Sheets 選單中點選「擴充功能」 $\rightarrow$ 「Apps Script」。
-2. 點選左側選單的 **「專案設定」** ⚙️ (齒輪圖示)。
-3. 下拉到 **「指令碼屬性」** 區塊，新增以下兩組欄位：
-   * **屬性**：`DISCORD_WEBHOOK_URL`  
-     **值**：`https://discordapp.com/api/webhooks/您的WebhookID/您的WebhookToken`
-   * **屬性**：`GEMINI_API_KEY`  
-     **值**：`您的 Gemini API Key` (至 Google AI Studio 免費申請)
-4. 務必點擊 **「儲存指令碼屬性」**。
-
-> [!TIP]
-> **💡 Cloudflare Error 1015 (429 Rate Limit) 解套偏方：**
-> 由於 Google Apps Script 的雲端伺服器 IP 為全球共享，常因其他用戶過度發送請求而導致 Discord Webhook 被 Cloudflare 判定為惡意刷流量並回傳 1015 錯誤。
-> **最簡單安全的解決方法是：將 Webhook 網域中的 `discord.com` 改寫為舊版官方網域 `discordapp.com`**（如上所示）。
-
----
-
 ## ⏰ 自動化排程與發布設定
 
 若要使系統在背景自動發送早報與監控股價，請於 Apps Script 左側選單點選 **「觸發器 (Triggers)」** ⏰ 並進行以下設定：
@@ -101,16 +80,6 @@ graph TD
 | `agentDailyAnalysisTW` | 時間驅動 | 特定時間 | 每週一至週五 下午 4:30 至 5:30 (收盤 AI 分析) |
 | `agentDailyAnalysisUS` | 時間驅動 | 特定時間 | 每週二至週六 早上 7:00 至 8:00 (收盤 AI 分析) |
 
-### 2. 啟用遠端 Discord 控制台 (Web App)
-1. 在 Apps Script 編輯器右上角點選 **「部署」** $\rightarrow$ **「新增部署」**。
-2. 類型選擇 **「網頁應用程式 (Web App)」**。
-3. 設定選項：
-   * **執行身份**：我 (您的 Google 帳號)。
-   * **誰有存取權**：所有人 (Anyone) — *不用擔心安全問題，進入點有 `webAppKey` 密鑰保護*。
-4. 部署後複製產生的 **Web App 網址**。
-5. 將此網址貼回 [Code.js](file:///d:/AntigravityProjects/Investmet%20Monitor%20Bot/Code.js) 中 `CONFIG.manualWebAppUrl` 的位置，並重新發送一次控制台網頁即可正常運作！
-
----
 
 ## 🧪 系統偵錯與檢測工具
 

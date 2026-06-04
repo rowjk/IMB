@@ -1,4 +1,4 @@
-# 📈 個人投資監控助理 (Investment Monitor Bot) v14.4 (Macro-Aware Edition)
+# 📈 個人投資監控助理 (Investment Monitor Bot) v14.4
 
 這是一個基於 **Google Sheets**、**Google Apps Script (GAS)** 與 **Gemini AI** 打造的個人自動化投資監控與 AI 分析系統。透過 Discord Webhook 進行多市場的即時推播，並附帶專屬的 Discord 手機版互動控制台。
 

@@ -68,6 +68,26 @@ graph TD
 
 ---
 
+## 🔑 安全設定與環境變數
+
+本系統使用 Google Apps Script 的「指令碼屬性 (Script Properties)」存放敏感金鑰與設定，防止任何程式碼在 GitHub 等版控平台上外洩：
+
+### 1. 新增指令碼屬性步驟
+1. 在 Google Sheets 選單中點選「擴充功能」 $\rightarrow$ 「Apps Script」。
+2. 點選左側選單的 **「專案設定」** ⚙️ (齒輪圖示)。
+3. 下拉到 **「指令碼屬性」** 區塊，新增以下四組欄位：
+   * **屬性**：`DISCORD_WEBHOOK_URL`  
+     **值**：`https://discordapp.com/api/webhooks/您的WebhookID/您的WebhookToken` (使用 `discordapp.com` 繞過 429 封鎖)
+   * **屬性**：`GEMINI_API_KEY`  
+     **值**：`您的 Gemini API Key` (至 Google AI Studio 免費申請)
+   * **屬性**：`WEB_APP_KEY`  
+     **值**：`自訂一組網頁密鑰` (例如: `10083abc`，用於防止他人惡意呼叫您的 Web App API)
+   * **屬性**：`MANUAL_WEB_APP_URL`  
+     **值**：`您的 GAS Web App 網址` (用於發送 Discord 互動控制台超連結的跳轉連結)
+4. 點擊 **「儲存指令碼屬性」**。
+
+---
+
 ## ⏰ 自動化排程與發布設定
 
 若要使系統在背景自動發送早報與監控股價，請於 Apps Script 左側選單點選 **「觸發器 (Triggers)」** ⏰ 並進行以下設定：

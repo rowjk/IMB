@@ -24,9 +24,9 @@ const CONFIG = {
   defaultThresholds: [0.03, 0.05, 0.10], 
   cooldownSeconds: 1800,                 
   
-  // 4. Web App 安全設定
-  webAppKey: '10083abc', 
-  manualWebAppUrl: 'https://script.google.com/macros/s/AKfycbxxVKPlU6rJFD8E6WcnZlEW2uLnaLm5voFpMz3G_8kgW2bY8oawa3dAPJtTkJctHT2Lgg/exec', 
+  // 4. Web App 安全設定 (已改為從 Script Properties 讀取以防版控外洩)
+  webAppKey: scriptProperties.getProperty('WEB_APP_KEY') || '', 
+  manualWebAppUrl: scriptProperties.getProperty('MANUAL_WEB_APP_URL') || '', 
   
   // 5. 市場設定 (含時區與假日日曆)
   markets: {
@@ -816,10 +816,14 @@ function testProperties() {
   const scriptProperties = PropertiesService.getScriptProperties();
   const discordVal = scriptProperties.getProperty('DISCORD_WEBHOOK_URL');
   const geminiVal = scriptProperties.getProperty('GEMINI_API_KEY');
+  const webAppKeyVal = scriptProperties.getProperty('WEB_APP_KEY');
+  const manualWebAppUrlVal = scriptProperties.getProperty('MANUAL_WEB_APP_URL');
   
   Logger.log("========= [Script Properties 測試開始] =========");
   Logger.log("📌 DISCORD_WEBHOOK_URL: " + (discordVal ? `已讀取成功，前15個字元為: ${discordVal.substring(0, 15)}...` : "❌ 讀取失敗 (可能為 null)"));
   Logger.log("📌 GEMINI_API_KEY: " + (geminiVal ? `已讀取成功，前8個字元為: ${geminiVal.substring(0, 8)}...` : "❌ 讀取失敗 (可能為 null)"));
+  Logger.log("📌 WEB_APP_KEY: " + (webAppKeyVal ? `已讀取成功，前3個字元為: ${webAppKeyVal.substring(0, 3)}...` : "❌ 讀取失敗 (可能為 null)"));
+  Logger.log("📌 MANUAL_WEB_APP_URL: " + (manualWebAppUrlVal ? `已讀取成功，前15個字元為: ${manualWebAppUrlVal.substring(0, 15)}...` : "❌ 讀取失敗 (可能為 null)"));
   Logger.log("================================================");
 }
 

@@ -824,3 +824,53 @@ function testProperties() {
   Logger.log("📌 GEMINI_API_KEY: " + (geminiVal ? `已讀取成功，前8個字元為: ${geminiVal.substring(0, 8)}...` : "❌ 讀取失敗 (可能為 null)"));
   Logger.log("================================================");
 }
+
+// 用於獨立測試 Gemini API 串接與回應時間的診斷函數
+function testGemini() {
+  const apiKey = PropertiesService.getScriptProperties().getProperty('GEMINI_API_KEY') || '';
+  if (!apiKey || apiKey.trim() === '') {
+    Logger.log("❌ 錯誤：找不到 GEMINI_API_KEY。請確認「專案設定」->「指令碼屬性」中已新增此屬性。");
+    return;
+  }
+  
+  const model = CONFIG.geminiModel; // 'gemini-3.5-flash'
+  Logger.log(`🤖 [Gemini API 測試] 開始呼叫模型: ${model}`);
+  
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+  const payload = {
+    contents: [{ parts: [{ text: "這是一次 API 測試。請簡短回答『測試成功』即可。" }] }],
+    generationConfig: { temperature: 0.1 }
+  };
+  const options = {
+    method: 'post',
+    contentType: 'application/json',
+    payload: JSON.stringify(payload),
+    muteHttpExceptions: true
+  };
+  
+  const startTime = new Date().getTime();
+  try {
+    Logger.log("📡 正在發送 REST 請求至: " + url.split('?')[0]);
+    const response = UrlFetchApp.fetch(url, options);
+    const endTime = new Date().getTime();
+    const elapsed = (endTime - startTime) / 1000;
+    
+    const responseCode = response.getResponseCode();
+    Logger.log(`🔔 收到回應！花費時間: ${elapsed.toFixed(2)} 秒，HTTP 狀態碼: ${responseCode}`);
+    
+    const responseText = response.getContentText();
+    if (responseCode >= 200 && responseCode < 300) {
+      const result = JSON.parse(responseText);
+      if (result.candidates && result.candidates.length > 0) {
+        const text = result.candidates[0].content.parts[0].text;
+        Logger.log(`✅ Gemini 回應成功！內容如下:\n${text}`);
+      } else {
+        Logger.log(`⚠️ 回傳的 JSON 結構異常: \n${responseText}`);
+      }
+    } else {
+      Logger.log(`❌ API 回傳失敗。狀態碼: ${responseCode}，錯誤內容: \n${responseText}`);
+    }
+  } catch (e) {
+    Logger.log(`❌ 請求發生例外錯誤: ${e.toString()}`);
+  }
+}

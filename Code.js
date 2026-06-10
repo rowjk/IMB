@@ -417,66 +417,8 @@ function runAgentAnalysis(targetMarket) {
 }
 
 // ==========================================
-// 4. 盤前新聞早報模組 (v14.4 Macro-Aware Edition)
+// 4. 盤前新聞早報模組 (v15.0 Parallelized Edition)
 // ==========================================
-function fetchMarketMacroNews(market) {
-  let query = '';
-  // 針對不同市場設定大盤與總經關鍵字
-  if (market === 'TW') query = '台股 大盤 OR 總體經濟 OR 台積電 when:24h';
-  else if (market === 'US') query = 'US stock market OR Federal Reserve OR S&P 500 OR CPI when:24h';
-  else if (market === 'Crypto') query = 'Cryptocurrency market OR Bitcoin macro OR SEC when:24h';
-  
-  let hl = market === 'TW' ? 'zh-TW' : 'en-US';
-  let gl = market === 'TW' ? 'TW' : 'US';
-  let ceid = market === 'TW' ? 'TW:zh-Hant' : 'US:en';
-
-  const url = `https://news.google.com/rss/search?q=${encodeURIComponent(query)}&hl=${hl}&gl=${gl}&ceid=${ceid}`;
-  
-  try {
-    const response = UrlFetchApp.fetch(url, { muteHttpExceptions: true });
-    const document = XmlService.parse(response.getContentText());
-    const channel = document.getRootElement().getChild('channel');
-    if (!channel) return [];
-    
-    const items = channel.getChildren('item');
-    let newsList = [];
-    // 大盤新聞重要性高，取前 5 條
-    for (let i = 0; i < Math.min(items.length, 5); i++) {
-      newsList.push(items[i].getChildText('title'));
-    }
-    return newsList;
-  } catch (e) {
-    return [];
-  }
-}
-
-function fetchRecentNews(symbol, market) {
-  const cleanSymbol = symbol.includes(':') ? symbol.split(':')[1] : symbol;
-  let query = market === 'TW' ? `${cleanSymbol} 股票 when:24h` : `${cleanSymbol} stock when:24h`;
-  if (market === 'Crypto') query = `${cleanSymbol} crypto when:24h`;
-  
-  let hl = market === 'TW' ? 'zh-TW' : 'en-US';
-  let gl = market === 'TW' ? 'TW' : 'US';
-  let ceid = market === 'TW' ? 'TW:zh-Hant' : 'US:en';
-
-  const url = `https://news.google.com/rss/search?q=${encodeURIComponent(query)}&hl=${hl}&gl=${gl}&ceid=${ceid}`;
-  
-  try {
-    const response = UrlFetchApp.fetch(url, { muteHttpExceptions: true });
-    const document = XmlService.parse(response.getContentText());
-    const channel = document.getRootElement().getChild('channel');
-    if (!channel) return [];
-    
-    const items = channel.getChildren('item');
-    let newsList = [];
-    for (let i = 0; i < Math.min(items.length, 3); i++) {
-      newsList.push(items[i].getChildText('title'));
-    }
-    return newsList;
-  } catch (e) {
-    return [];
-  }
-}
 
 function generateMorningBriefing(targetMarket) {
   if (checkMarketClosed(targetMarket)) { return; }

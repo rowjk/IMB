@@ -37,7 +37,7 @@ const CONFIG = {
 
   // 6. Gemini AI Agent 設定 (已改為從 Script Properties 讀取以防版控外洩)
   geminiApiKey: scriptProperties.getProperty('GEMINI_API_KEY') || '', 
-  geminiModel: 'gemini-2.5-flash', // 預設使用 Flash 確保免費額度與執行速度
+  geminiModel: 'gemini-3.5-flash', // 使用 Gemini 3.5 Flash 模型以獲得更佳分析性能與回覆速度
   
   // 盤後分析專用 Prompt
   agentPrompt: `你是一位冷靜、客觀的量化投資顧問。

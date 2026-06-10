@@ -1,5 +1,5 @@
 /**
- * 股票/BTC 監控系統 v14.4 (Macro-Aware Edition)
+ * 股票/BTC 監控系統 v15.0 (Gemini 3.5 & Parallel Edition)
  * * [系統功能]
  * 1. 盤中監控：自訂波動門檻、60MA 季線觸及警報、防洪冷卻。
  * 2. 盤後純數據日報：自動判斷休市(週末/國定假日)、結算總市值與淨損益。
@@ -834,7 +834,7 @@ function sendDashboard() {
   const message = {
     "content": null,
     "embeds": [{
-      "title": "🎛️ 投資監控控制台 v14.4",
+      "title": "🎛️ 投資監控控制台 v15.0",
       "description": "請點擊下方選項：",
       "color": 3447003,
       "fields": [
@@ -859,7 +859,7 @@ function sendDashboard() {
           "inline": false 
         }
       ],
-      "footer": { "text": "Powered by v14.4 | 內建大盤與總體經濟新聞爬蟲" }
+      "footer": { "text": "Powered by v15.0 | 內建大盤總經平行爬蟲" }
     }]
   };
   sendToDiscord(message);

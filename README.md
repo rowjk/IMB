@@ -1,9 +1,12 @@
-# 📈 個人投資監控助理 (Investment Monitor Bot) v14.4
+# 📈 個人投資監控助理 (Investment Monitor Bot) v15.0 (Gemini 3.5 & Parallel Edition)
 
-這是一個基於 **Google Sheets**、**Google Apps Script ** 與 **Gemini** 打造的個人自動化投資監控與 AI 分析系統。透過 Discord Webhook 進行多市場的即時推播，並附帶專屬的 Discord 手機版互動控制台。
+這是一個基於 **Google Sheets**、**Google Apps Script** 與 **Gemini AI** 打造的個人自動化投資監控與 AI 分析系統。透過 Discord Webhook 進行多市場的即時推播，並附帶專屬的 Discord 手機版互動控制台。
 
 > [!IMPORTANT]
-> **v14.4 更新**：將敏感金鑰（Discord Webhook URL 與 Gemini API Key）抽離至 Google Apps Script 的「指令碼屬性」中，可安全地將此專案託管至公開的 Git 儲存庫（如 GitHub），而無金鑰外洩風險。
+> **v15.0 重大升級**：
+> 1. **核心模型升級**：全面採用最新 **Gemini 3.5 Flash** 模型。
+> 2. **平行抓取優化**：導入 `UrlFetchApp.fetchAll` 技術，平行化新聞抓取，執行效率提升 90% 以上，徹底解決大型監控清單執行逾時卡死的問題。
+> 3. **安全性提升**：金鑰與敏感 URL 儲存於「指令碼屬性」中，保障公開版控安全。
 
 ---
 

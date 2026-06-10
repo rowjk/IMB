@@ -490,17 +490,27 @@ function generateMorningBriefing(targetMarket) {
   let holdingSymbols = [];
   let watchSymbols = [];
 
-  // 1. 強制優先抓取並推入「大盤總經」新聞
-  const macroNews = fetchMarketMacroNews(targetMarket);
-  if (macroNews.length > 0) {
-    newsContext.push({
-      "標的": "總體經濟與大盤環境",
-      "狀態": "【市場大趨勢】",
-      "近24小時重要新聞": macroNews
-    });
-  }
+  const fetchTasks = [];
 
-  // 2. 抓取個別標的新聞
+  // 1. 設定「大盤總經」新聞查詢任務
+  let macroQuery = '';
+  if (targetMarket === 'TW') macroQuery = '台股 大盤 OR 總體經濟 OR 台積電 when:24h';
+  else if (targetMarket === 'US') macroQuery = 'US stock market OR Federal Reserve OR S&P 500 OR CPI when:24h';
+  else if (targetMarket === 'Crypto') macroQuery = 'Cryptocurrency market OR Bitcoin macro OR SEC when:24h';
+  
+  let hl = targetMarket === 'TW' ? 'zh-TW' : 'en-US';
+  let gl = targetMarket === 'TW' ? 'TW' : 'US';
+  let ceid = targetMarket === 'TW' ? 'TW:zh-Hant' : 'US:en';
+
+  const macroUrl = `https://news.google.com/rss/search?q=${encodeURIComponent(macroQuery)}&hl=${hl}&gl=${gl}&ceid=${ceid}`;
+  fetchTasks.push({
+    url: macroUrl,
+    symbol: "總體經濟與大盤環境",
+    statusText: "【市場大趨勢】",
+    isMacro: true
+  });
+
+  // 2. 蒐集個股新聞查詢任務
   data.forEach(row => {
     if (row[1] === targetMarket && row[0] !== "") {
       const symbol = row[0];
@@ -513,16 +523,62 @@ function generateMorningBriefing(targetMarket) {
         watchSymbols.push(symbol);
       }
 
-      const recentNews = fetchRecentNews(symbol, targetMarket);
-      if (recentNews.length > 0) {
-        newsContext.push({
-          "標的": symbol,
-          "狀態": isHolding ? "實際持有" : "觀察名單",
-          "近24小時重要新聞": recentNews
-        });
-      }
+      const cleanSymbol = symbol.includes(':') ? symbol.split(':')[1] : symbol;
+      let query = targetMarket === 'TW' ? `${cleanSymbol} 股票 when:24h` : `${cleanSymbol} stock when:24h`;
+      if (targetMarket === 'Crypto') query = `${cleanSymbol} crypto when:24h`;
+      
+      const url = `https://news.google.com/rss/search?q=${encodeURIComponent(query)}&hl=${hl}&gl=${gl}&ceid=${ceid}`;
+      fetchTasks.push({
+        url: url,
+        symbol: symbol,
+        statusText: isHolding ? "實際持有" : "觀察名單",
+        isMacro: false
+      });
     }
   });
+
+  // 3. 執行平行 HTTP 請求抓取新聞
+  if (fetchTasks.length > 0) {
+    Logger.log(`📡 [平行抓取] 開始平行發送 ${fetchTasks.length} 個新聞請求...`);
+    const requests = fetchTasks.map(task => ({
+      url: task.url,
+      method: "get",
+      muteHttpExceptions: true
+    }));
+    
+    try {
+      const responses = UrlFetchApp.fetchAll(requests);
+      
+      fetchTasks.forEach((task, idx) => {
+        try {
+          const responseText = responses[idx].getContentText();
+          const document = XmlService.parse(responseText);
+          const channel = document.getRootElement().getChild('channel');
+          if (!channel) return;
+          
+          const items = channel.getChildren('item');
+          let newsList = [];
+          const maxNewsCount = task.isMacro ? 5 : 3; // 大盤新聞取前 5 條，個股取前 3 條
+          
+          for (let i = 0; i < Math.min(items.length, maxNewsCount); i++) {
+            newsList.push(items[i].getChildText('title'));
+          }
+          
+          if (newsList.length > 0) {
+            newsContext.push({
+              "標的": task.symbol,
+              "狀態": task.statusText,
+              "近24小時重要新聞": newsList
+            });
+          }
+        } catch (e) {
+          Logger.log(`⚠️ 解析 ${task.symbol} 的新聞 XML 失敗: ${e}`);
+        }
+      });
+    } catch (e) {
+      Logger.log(`❌ 平行抓取新聞發生系統錯誤: ${e}`);
+    }
+  }
 
   if (newsContext.length === 0) {
     Logger.log(`${targetMarket} 無最新重點新聞。`);

@@ -986,8 +986,13 @@ function fetchYahooFallback(symbol, market) {
 
   try {
     // 1. 安全字元過濾 (防注入)
-    let cleanSymbol = symbol.trim().replace(/^(TPE:|TWS:)/i, '').replace(/[^a-zA-Z0-9.-]/g, '');
-    if (market === 'TW' && !cleanSymbol.includes('.')) {
+    let cleanSymbol = symbol.trim().replace(/^(TPE:|TWS:|CURRENCY:)/i, '').replace(/[^a-zA-Z0-9.-]/g, '');
+    let isCryptoTwd = false;
+
+    if (market === 'Crypto' && cleanSymbol.toUpperCase().includes('BTCTWD')) {
+      cleanSymbol = 'BTC-USD';
+      isCryptoTwd = true;
+    } else if (market === 'TW' && !cleanSymbol.includes('.')) {
       cleanSymbol += '.TW'; // 0050 自動補齊為 0050.TW
     }
 
@@ -1032,11 +1037,23 @@ function fetchYahooFallback(symbol, market) {
     }
 
     const dayChangePct = (currentPrice - prevClose) / prevClose;
+    let finalCurrentPrice = currentPrice;
+    let finalPrevClose = prevClose;
+
+    if (isCryptoTwd) {
+      let rate = 32.0;
+      try {
+        const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(CONFIG.sheetName);
+        if (sheet) rate = getExchangeRate(sheet);
+      } catch (e) {}
+      finalCurrentPrice = Math.round(currentPrice * rate * 100) / 100;
+      finalPrevClose = Math.round(prevClose * rate * 100) / 100;
+    }
 
     const result = {
-      currentPrice: currentPrice,
+      currentPrice: finalCurrentPrice,
       dayChangePct: dayChangePct,
-      prevClose: prevClose
+      prevClose: finalPrevClose
     };
 
     // 快取 3 分鐘 (180 秒)

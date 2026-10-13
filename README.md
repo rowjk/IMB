@@ -41,15 +41,15 @@
 
 ```mermaid
 graph TD
-    Sheet[(Google Sheets<br>資料庫)] -->|讀取持倉、現價、60MA| GAS[Google Apps Script<br>運算核心]
-    Yahoo[Yahoo Finance API v8<br>備援引擎] -.->|當 GoogleFinance #N/A 時備援| Sheet
+    Sheet[("Google Sheets<br>資料庫")] -->|讀取持倉、現價、60MA| GAS["Google Apps Script<br>運算核心"]
+    Yahoo["Yahoo Finance API v8<br>備援引擎"] -.->|當 GoogleFinance 異常時備援| Sheet
     Yahoo -.->|補回現價與漲跌幅| GAS
-    Calendar(Google Calendar<br>休市判斷) -->|時區校正假日查詢| GAS
-    News(Google News RSS<br>24h 即時新聞) -->|平行爬取大盤與個股新聞| GAS
-    GAS -->|提供部位明細與新聞上下文| Gemini[Gemini AI<br>gemini-3.8-flash]
+    Calendar["Google Calendar<br>休市判斷"] -->|時區校正假日查詢| GAS
+    News["Google News RSS<br>24h 即時新聞"] -->|平行爬取大盤與個股新聞| GAS
+    GAS -->|提供部位明細與新聞上下文| Gemini["Gemini AI<br>gemini-3.8-flash"]
     Gemini -->|產出結構化早報與風控報告| GAS
-    GAS -->|發送 Rich Embed 卡片 (防溢位分頁)| Discord[Discord Webhook<br>通知頻道]
-    Discord -->|點擊控制台超連結| WebApp[GAS Web App<br>doGet 遠端接收器]
+    GAS -->|"發送 Rich Embed 卡片 (防溢位分頁)"| Discord["Discord Webhook<br>通知頻道"]
+    Discord -->|點擊控制台超連結| WebApp["GAS Web App<br>doGet 遠端接收器"]
     WebApp -->|觸發指令| GAS
 ```
 

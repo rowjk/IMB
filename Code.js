@@ -1,5 +1,5 @@
 /**
- * 股票/BTC 監控系統 v15.1 (Yahoo Fallback Edition)
+ * 股票/BTC 監控系統 v15.2 (Stability & Hardening Edition)
  * * [系統功能]
  * 1. 盤中監控：自訂波動門檻、60MA 季線觸及警報、防洪冷卻。
  * 2. 盤後純數據日報：自動判斷休市(週末/國定假日)、結算總市值與淨損益。
@@ -68,10 +68,11 @@ function checkStockPrice() {
 
   data.forEach((row) => {
     try {
-      const [symbol, market, quantityRaw, avgCost, currentPriceRaw, , dayChangePctRaw, lastStatus, feeRateRaw, customThreshold, , ma60] = row;
+      const [symbol, market, quantityRaw, avgCostRaw, currentPriceRaw, , dayChangePctRaw, lastStatus, feeRateRaw, customThreshold, , ma60] = row;
       let currentPrice = currentPriceRaw;
       let dayChangePct = dayChangePctRaw;
       const quantity = (quantityRaw === "" || quantityRaw === null) ? "" : Number(quantityRaw);
+      const avgCost = Number(avgCostRaw) || 0;
       const feeRate = Number(feeRateRaw) || 0;
 
       // 若 GoogleFinance 失敗（非數字或 #N/A），自動切換至 Yahoo Finance 備援
@@ -115,7 +116,7 @@ function checkStockPrice() {
               }]
             };
             sendToDiscord(maMessage);
-            cache.put(maCacheKey, 'true', 43200); 
+            cache.put(maCacheKey, 'true', 21600); // CacheService 最大支援 21600 秒 (6 小時)
           }
         }
       }
@@ -230,10 +231,11 @@ function generateReport(targetMarket) {
   }
 
   data.forEach((row, idx) => {
-    const [symbol, market, quantityRaw, avgCost, currentPriceRaw, , dayChangePctRaw, , feeRateRaw] = row;
+    const [symbol, market, quantityRaw, avgCostRaw, currentPriceRaw, , dayChangePctRaw, , feeRateRaw] = row;
     let currentPrice = currentPriceRaw;
     let dayChangePct = dayChangePctRaw;
     const quantity = (quantityRaw === "" || quantityRaw === null) ? "" : Number(quantityRaw);
+    const avgCost = Number(avgCostRaw) || 0;
     const feeRate = Number(feeRateRaw) || 0;
     const rowNum = idx + 2;
 
@@ -274,7 +276,7 @@ function generateReport(targetMarket) {
         effectiveDayChangePct = 0; 
         dayPnL = 0;
       } else if (typeof dayChangePct === 'number' && !isNaN(dayChangePct)) {
-        const yesterdayPrice = currentPrice / (1 + dayChangePct);
+        const yesterdayPrice = (dayChangePct <= -1) ? 0 : currentPrice / (1 + dayChangePct);
         dayPnL = (currentPrice - yesterdayPrice) * quantity;
       }
 
@@ -334,6 +336,41 @@ function generateReport(targetMarket) {
 
   const titleSuffix = isClosed ? " (😴 休市)" : "";
 
+  // 分割持股清單，避免超過 Discord 單一 Field 1024 字元上限 (HTTP 400 Bad Request)
+  const stockFields = [];
+  if (stockList.length === 0) {
+    stockFields.push({ "name": "------------------", "value": "無資料", "inline": false });
+  } else {
+    let currentChunk = [];
+    let currentLen = 0;
+    let chunkIndex = 1;
+
+    stockList.forEach((item) => {
+      // 保守以 950 字元為分段門檻
+      if (currentLen + item.length + 1 > 950 && currentChunk.length > 0) {
+        stockFields.push({
+          "name": chunkIndex === 1 ? "------------------" : `持股明細 (${chunkIndex})`,
+          "value": currentChunk.join('\n'),
+          "inline": false
+        });
+        chunkIndex++;
+        currentChunk = [item];
+        currentLen = item.length;
+      } else {
+        currentChunk.push(item);
+        currentLen += item.length + 1;
+      }
+    });
+
+    if (currentChunk.length > 0) {
+      stockFields.push({
+        "name": chunkIndex === 1 ? "------------------" : `持股明細 (${chunkIndex})`,
+        "value": currentChunk.join('\n'),
+        "inline": false
+      });
+    }
+  }
+
   const message = {
     "content": null,
     "embeds": [{
@@ -343,7 +380,7 @@ function generateReport(targetMarket) {
         { "name": "總市值 (帳面)", "value": formatDualMoney(totalGrossMarketValue, currency, exchangeRate), "inline": true },
         { "name": "預估淨損益", "value": `${formatDualMoney(totalNetPnL, currency, exchangeRate)}\n(${totalNetPnLPercent})`, "inline": true },
         { "name": "今日行情增減", "value": dayChangeFieldStr, "inline": true },
-        { "name": "------------------", "value": stockList.join('\n') || "無資料", "inline": false }
+        ...stockFields
       ],
       "footer": { "text": `Rate: ${exchangeRate} | Net Asset Report` },
       "timestamp": new Date().toISOString()
@@ -685,14 +722,20 @@ function checkMarketClosed(targetMarket) {
   const marketConfig = CONFIG.markets[targetMarket];
   if (!marketConfig || !marketConfig.calendarId) return false;
 
-  const today = new Date();
-  const dayOfWeek = Utilities.formatDate(today, marketConfig.timeZone, 'EEE');
+  const now = new Date();
+  const dayOfWeek = Utilities.formatDate(now, marketConfig.timeZone, 'EEE');
   if (dayOfWeek === 'Sat' || dayOfWeek === 'Sun') return true;
 
   try {
     const calendar = CalendarApp.getCalendarById(marketConfig.calendarId);
     if (calendar) {
-      const events = calendar.getEventsForDay(today);
+      // 依目標市場時區計算該市場當日的起訖時間，避免因 GAS 預設時區 (如 Asia/Taipei) 產生跨日偏差
+      const ymd = Utilities.formatDate(now, marketConfig.timeZone, 'yyyy-MM-dd');
+      const tzOffset = Utilities.formatDate(now, marketConfig.timeZone, 'XXX');
+      const startOfDay = new Date(`${ymd}T00:00:00${tzOffset}`);
+      const endOfDay = new Date(`${ymd}T23:59:59${tzOffset}`);
+
+      const events = calendar.getEvents(startOfDay, endOfDay);
       if (events.length > 0) return true;
     }
   } catch (e) {
@@ -709,7 +752,7 @@ function formatDualMoney(amount, currency, rate) {
 }
 
 function formatMoney(num) {
-  if (typeof num !== 'number') return num;
+  if (typeof num !== 'number' || !isFinite(num)) return num;
   return num.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
 }
 

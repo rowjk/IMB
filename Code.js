@@ -1006,7 +1006,7 @@ function fetchYahooFallback(symbol, market) {
       } catch (e) {}
     }
 
-    const url = `https://query2.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(cleanSymbol)}?interval=1d&range=1mo`;
+    const url = `https://query2.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(cleanSymbol)}?interval=1d&range=5d`;
     
     // 3. 偽裝標準瀏覽器標頭，降低 WAF 封鎖機率
     const options = {
@@ -1030,13 +1030,17 @@ function fetchYahooFallback(symbol, market) {
 
     const meta = data.chart.result[0].meta;
     const currentPrice = meta.regularMarketPrice;
-    const prevClose = meta.chartPreviousClose;
+    if (typeof currentPrice !== 'number') return null;
 
-    if (typeof currentPrice !== 'number' || typeof prevClose !== 'number' || prevClose === 0) {
-      return null;
+    // 優先讀取 Yahoo 官方單日漲跌幅 regularMarketChangePercent (避免 range=1mo 造成 chartPreviousClose 抓成前一個月的昨收)
+    let dayChangePct = 0;
+    if (typeof meta.regularMarketChangePercent === 'number') {
+      dayChangePct = meta.regularMarketChangePercent / 100;
+    } else if (typeof meta.chartPreviousClose === 'number' && meta.chartPreviousClose > 0) {
+      dayChangePct = (currentPrice - meta.chartPreviousClose) / meta.chartPreviousClose;
     }
 
-    const dayChangePct = (currentPrice - prevClose) / prevClose;
+    const prevClose = (dayChangePct !== -1) ? (currentPrice / (1 + dayChangePct)) : currentPrice;
     let finalCurrentPrice = currentPrice;
     let finalPrevClose = prevClose;
 

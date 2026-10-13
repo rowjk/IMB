@@ -1,12 +1,13 @@
-# 📈 個人投資監控助理 (Investment Monitor Bot) v15.0 (Gemini 3.5 & Parallel Edition)
+# 📈 個人投資監控助理 (Investment Monitor Bot) v15.1 (Yahoo Fallback Edition)
 
 這是一個基於 **Google Sheets**、**Google Apps Script** 與 **Gemini AI** 打造的個人自動化投資監控與 AI 分析系統。透過 Discord Webhook 進行多市場的即時推播，並附帶專屬的 Discord 手機版互動控制台。
 
 > [!IMPORTANT]
-> **v15.0 重大升級**：
-> 1. **核心模型升級**：全面採用最新 **Gemini 3.5 Flash** 模型。
-> 2. **平行抓取優化**：導入 `UrlFetchApp.fetchAll` 技術，平行化新聞抓取，執行效率提升 90% 以上，徹底解決大型監控清單執行逾時卡死的問題。
-> 3. **安全性提升**：金鑰與敏感 URL 儲存於「指令碼屬性」中，保障公開版控安全。
+> **v15.1 重大升級 (Yahoo Fallback Edition)**：
+> 1. **雙引擎行情備援 (Yahoo Finance Fallback)**：解決 GoogleFinance 針對台股 ETF（如 `0050` 等標的）頻繁回傳 `#N/A` 的缺陷。當 GoogleFinance 發生錯誤或無數值時，系統自動啟用 Yahoo Finance API v8 毫秒級無縫接管，補全現價與漲跌幅。
+> 2. **核心模型升級**：全面採用最新 **Gemini 3.5 Flash** 模型。
+> 3. **平行抓取優化**：導入 `UrlFetchApp.fetchAll` 技術，平行化新聞抓取，執行效率提升 90% 以上。
+> 4. **全端安全性防護**：金鑰與敏感 URL 儲存於「指令碼屬性」，Yahoo 備援模組內建字元白名單過濾防注入與 WAF 防火牆偽裝。
 
 ---
 
@@ -106,6 +107,8 @@ graph TD
 
 ## 🧪 系統偵錯與檢測工具
 
-本專案內建了兩個便於檢測的工具函數：
-* **`testProperties()`**：執行後會在執行紀錄中確認 `DISCORD_WEBHOOK_URL` 與 `GEMINI_API_KEY` 是否有被 GAS 正確讀取，並輸出部分遮罩後的內容以供核對。
+本專案內建了數個便於檢測的工具函數：
+* **`testYahooFallback()`**：執行後會獨立測試 Yahoo Finance API 對 `0050`、`0050.TW`、`2330.TW` 與 `VOO` 的行情抓取狀況與回應速度，方便確認備援機制是否正常運作。
+* **`testProperties()`**：執行後會在執行紀錄中確認環境變數屬性是否有被 GAS 正確讀取，並輸出部分遮罩後的內容以供核對。
+* **`testGemini()`**：獨立測試與 Gemini API 的連線與回應時間。
 * **`sendDashboard()`**：手動執行此函數，會立刻發送一封「最新互動控制台 Embed 卡片」至您的 Discord，便於您一鍵手動操控所有分析。

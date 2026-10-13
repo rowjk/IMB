@@ -1,5 +1,5 @@
 /**
- * 股票/BTC 監控系統 v15.0 (Gemini 3.5 & Parallel Edition)
+ * 股票/BTC 監控系統 v15.1 (Yahoo Fallback Edition)
  * * [系統功能]
  * 1. 盤中監控：自訂波動門檻、60MA 季線觸及警報、防洪冷卻。
  * 2. 盤後純數據日報：自動判斷休市(週末/國定假日)、結算總市值與淨損益。
@@ -68,9 +68,21 @@ function checkStockPrice() {
 
   data.forEach((row) => {
     try {
-      const [symbol, market, quantityRaw, avgCost, currentPrice, , dayChangePct, lastStatus, feeRateRaw, customThreshold, , ma60] = row;
+      const [symbol, market, quantityRaw, avgCost, currentPriceRaw, , dayChangePctRaw, lastStatus, feeRateRaw, customThreshold, , ma60] = row;
+      let currentPrice = currentPriceRaw;
+      let dayChangePct = dayChangePctRaw;
       const quantity = (quantityRaw === "" || quantityRaw === null) ? "" : Number(quantityRaw);
       const feeRate = Number(feeRateRaw) || 0;
+
+      // 若 GoogleFinance 失敗（非數字或 #N/A），自動切換至 Yahoo Finance 備援
+      if (symbol && quantity !== "" && (typeof currentPrice !== 'number' || typeof dayChangePct !== 'number' || isNaN(dayChangePct))) {
+        const fallback = fetchYahooFallback(symbol, market);
+        if (fallback) {
+          currentPrice = fallback.currentPrice;
+          dayChangePct = fallback.dayChangePct;
+          Logger.log(`🔄 [盤中 Yahoo 備援] ${symbol} 成功取得數據：現價 ${currentPrice}, 漲跌幅 ${(dayChangePct * 100).toFixed(2)}%`);
+        }
+      }
 
       if (!symbol || quantity === "" || typeof currentPrice !== 'number' || typeof dayChangePct !== 'number' || isNaN(dayChangePct)) {
         updates.push([lastStatus]); 
@@ -218,10 +230,22 @@ function generateReport(targetMarket) {
   }
 
   data.forEach((row, idx) => {
-    const [symbol, market, quantityRaw, avgCost, currentPrice, , dayChangePct, , feeRateRaw] = row;
+    const [symbol, market, quantityRaw, avgCost, currentPriceRaw, , dayChangePctRaw, , feeRateRaw] = row;
+    let currentPrice = currentPriceRaw;
+    let dayChangePct = dayChangePctRaw;
     const quantity = (quantityRaw === "" || quantityRaw === null) ? "" : Number(quantityRaw);
     const feeRate = Number(feeRateRaw) || 0;
     const rowNum = idx + 2;
+
+    // 若 GoogleFinance 失敗（非數字或 #N/A），自動由 Yahoo Finance 接管
+    if (market === targetMarket && symbol && quantity !== "" && (typeof currentPrice !== 'number' || typeof dayChangePct !== 'number' || isNaN(dayChangePct))) {
+      const fallback = fetchYahooFallback(symbol, market);
+      if (fallback) {
+        currentPrice = fallback.currentPrice;
+        dayChangePct = fallback.dayChangePct;
+        Logger.log(`   🔄 [日報 Yahoo 備援] ${symbol} 成功補回數據：現價 ${currentPrice}, 漲跌幅 ${(dayChangePct * 100).toFixed(2)}%`);
+      }
+    }
 
     if (market === targetMarket) {
       Logger.log(`👉 檢查第 ${rowNum} 列 [${symbol}]：`);
@@ -230,7 +254,7 @@ function generateReport(targetMarket) {
       Logger.log(`   - 目前價格: ${currentPrice} (型態: ${typeof currentPrice})`);
       
       if (typeof currentPrice !== 'number') {
-        Logger.log(`   ⚠️ 警告：目前價格不是數字類型！請確認試算表公式是否回傳錯誤值或讀取中。`);
+        Logger.log(`   ⚠️ 警告：目前價格不是數字類型！Yahoo 備援亦未成功或無資料。`);
       }
       if (quantity === "") {
         Logger.log(`   ⚠️ 警告：持有數量為空值，此列將被略過。`);
@@ -343,15 +367,27 @@ function runAgentAnalysis(targetMarket) {
 
   const portfolioData = data.filter(row => row[1] === targetMarket && row[0] !== "")
     .map(row => {
+      const symbol = row[0];
       const quantityRaw = row[2];
       const isHolding = (quantityRaw !== "" && quantityRaw !== null && Number(quantityRaw) > 0);
+      let currentPrice = row[4];
+      let dayChangePct = row[6];
+
+      // 若 GoogleFinance 失敗（非數字或 #N/A），自動由 Yahoo Finance 接管
+      if (typeof currentPrice !== 'number' || typeof dayChangePct !== 'number' || isNaN(dayChangePct)) {
+        const fallback = fetchYahooFallback(symbol, targetMarket);
+        if (fallback) {
+          currentPrice = fallback.currentPrice;
+          dayChangePct = fallback.dayChangePct;
+        }
+      }
       
       return {
-        "標的": row[0],
+        "標的": symbol,
         "狀態": isHolding ? "實際持有" : "僅空手監控",
         "累積總損益": isHolding ? ((typeof row[5] === 'number') ? (row[5] * 100).toFixed(2) + '%' : row[5]) : "N/A",
-        "現價": typeof row[4] === 'number' ? row[4] : "N/A",
-        "單日漲跌幅": (typeof row[6] === 'number') ? (row[6] * 100).toFixed(2) + '%' : 'N/A',
+        "現價": typeof currentPrice === 'number' ? currentPrice : "N/A",
+        "單日漲跌幅": (typeof dayChangePct === 'number') ? (dayChangePct * 100).toFixed(2) + '%' : 'N/A',
         "季線(60MA)": typeof row[11] === 'number' ? row[11] : "N/A"
       };
     });
@@ -606,8 +642,8 @@ function morningBriefingUS() { generateMorningBriefing('US'); }
 // 5. Web App 接口
 // ==========================================
 function doGet(e) {
-  if (!e.parameter.key || e.parameter.key !== CONFIG.webAppKey) {
-    return ContentService.createTextOutput("⛔ 存取被拒：密碼錯誤");
+  if (!CONFIG.webAppKey || !e.parameter.key || e.parameter.key !== CONFIG.webAppKey) {
+    return ContentService.createTextOutput("⛔ 存取被拒：密碼錯誤或系統尚未設定密鑰");
   }
 
   const cmd = e.parameter.cmd;
@@ -776,7 +812,7 @@ function sendDashboard() {
   const message = {
     "content": null,
     "embeds": [{
-      "title": "🎛️ 投資監控控制台 v15.0",
+      "title": "🎛️ 投資監控控制台 v15.1",
       "description": "請點擊下方選項：",
       "color": 3447003,
       "fields": [
@@ -801,7 +837,7 @@ function sendDashboard() {
           "inline": false 
         }
       ],
-      "footer": { "text": "Powered by v15.0 | 內建大盤總經平行爬蟲" }
+      "footer": { "text": "Powered by v15.1 | 內建 Yahoo 備援與大盤總經平行爬蟲" }
     }]
   };
   sendToDiscord(message);
@@ -875,4 +911,105 @@ function testGemini() {
   } catch (e) {
     Logger.log(`❌ 請求發生例外錯誤: ${e.toString()}`);
   }
+}
+
+// ==========================================
+// 8. Yahoo Finance API 備援模組 (v15.1)
+// ==========================================
+/**
+ * 安全版 Yahoo Finance API v8 備援取得價格
+ * 當 GoogleFinance 發生 #N/A、逾時或無法解析時自動接管
+ */
+function fetchYahooFallback(symbol, market) {
+  if (!symbol || typeof symbol !== 'string') return null;
+
+  try {
+    // 1. 安全字元過濾 (防注入)
+    let cleanSymbol = symbol.trim().replace(/^(TPE:|TWS:)/i, '').replace(/[^a-zA-Z0-9.-]/g, '');
+    if (market === 'TW' && !cleanSymbol.includes('.')) {
+      cleanSymbol += '.TW'; // 0050 自動補齊為 0050.TW
+    }
+
+    // 2. 快取檢查 (避免同分鐘內頻繁向 Yahoo 請求相同標的)
+    const cache = CacheService.getScriptCache();
+    const cacheKey = `YAHOO_PRICE_${cleanSymbol}`;
+    const cachedData = cache.get(cacheKey);
+    if (cachedData) {
+      try {
+        return JSON.parse(cachedData);
+      } catch (e) {}
+    }
+
+    const url = `https://query2.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(cleanSymbol)}?interval=1d&range=1mo`;
+    
+    // 3. 偽裝標準瀏覽器標頭，降低 WAF 封鎖機率
+    const options = {
+      method: 'get',
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+      },
+      muteHttpExceptions: true
+    };
+
+    const response = UrlFetchApp.fetch(url, options);
+    if (response.getResponseCode() !== 200) {
+      Logger.log(`⚠️ Yahoo API 請求失敗 (${cleanSymbol}) HTTP: ${response.getResponseCode()}`);
+      return null;
+    }
+
+    const data = JSON.parse(response.getContentText());
+    
+    // 4. 防禦性結構驗證 (防止 undefined 崩潰)
+    if (!data?.chart?.result?.[0]?.meta) return null;
+
+    const meta = data.chart.result[0].meta;
+    const currentPrice = meta.regularMarketPrice;
+    const prevClose = meta.chartPreviousClose;
+
+    if (typeof currentPrice !== 'number' || typeof prevClose !== 'number' || prevClose === 0) {
+      return null;
+    }
+
+    const dayChangePct = (currentPrice - prevClose) / prevClose;
+
+    const result = {
+      currentPrice: currentPrice,
+      dayChangePct: dayChangePct,
+      prevClose: prevClose
+    };
+
+    // 快取 3 分鐘 (180 秒)
+    cache.put(cacheKey, JSON.stringify(result), 180);
+
+    return result;
+
+  } catch (err) {
+    Logger.log(`❌ Yahoo Fallback 執行例外 (${symbol}): ${err.toString()}`);
+    return null;
+  }
+}
+
+// 用於獨立測試 Yahoo Finance API 備援機制的測試函數
+function testYahooFallback() {
+  Logger.log("========= [Yahoo Finance 備援測試開始] =========");
+  const testSymbols = [
+    { symbol: "0050", market: "TW" },
+    { symbol: "0050.TW", market: "TW" },
+    { symbol: "2330.TW", market: "TW" },
+    { symbol: "VOO", market: "US" }
+  ];
+
+  testSymbols.forEach(item => {
+    Logger.log(`🔍 測試標的: ${item.symbol} (${item.market})...`);
+    const startTime = new Date().getTime();
+    const data = fetchYahooFallback(item.symbol, item.market);
+    const elapsed = (new Date().getTime() - startTime) / 1000;
+    
+    if (data) {
+      Logger.log(`✅ 成功取得 (${elapsed.toFixed(2)} 秒) -> 現價: ${data.currentPrice}, 昨收: ${data.prevClose}, 漲跌幅: ${(data.dayChangePct * 100).toFixed(2)}%`);
+    } else {
+      Logger.log(`❌ 取得失敗 (${elapsed.toFixed(2)} 秒)`);
+    }
+  });
+  Logger.log("================================================");
 }

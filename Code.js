@@ -1,5 +1,5 @@
 /**
- * 股票/BTC 監控系統 v15.2 (Stability & Hardening Edition)
+ * 股票/BTC 監控系統 v15.3 (Gemini 3.8 Flash Edition)
  * * [系統功能]
  * 1. 盤中監控：自訂波動門檻、60MA 季線觸及警報、防洪冷卻。
  * 2. 盤後純數據日報：自動判斷休市(週末/國定假日)、結算總市值與淨損益。
@@ -37,7 +37,7 @@ const CONFIG = {
 
   // 6. Gemini AI Agent 設定 (已改為從 Script Properties 讀取以防版控外洩)
   geminiApiKey: scriptProperties.getProperty('GEMINI_API_KEY') || '', 
-  geminiModel: 'gemini-3.5-flash', // 使用 Gemini 3.5 Flash 模型以獲得更佳分析性能與回覆速度
+  geminiModel: 'gemini-3.8-flash', // 使用最新 Gemini 3.8 Flash 旗艦模型 (支援免費額度)
   
   // 盤後分析專用 Prompt
   agentPrompt: `你是一位冷靜、客觀的量化投資顧問。
@@ -436,7 +436,12 @@ function runAgentAnalysis(targetMarket) {
 
   const payload = {
     contents: [{ parts: [{ text: finalPrompt }] }],
-    generationConfig: { temperature: 0.2 }
+    generationConfig: {
+      temperature: 0.2,
+      thinkingConfig: {
+        thinkingLevel: 'low' // 限制思考延遲，防止 GAS 請求逾時卡住 (支援免費額度)
+      }
+    }
   };
 
   const options = {
@@ -451,7 +456,9 @@ function runAgentAnalysis(targetMarket) {
     const result = JSON.parse(response.getContentText());
 
     if (result.candidates && result.candidates.length > 0) {
-      const aiAnalysis = result.candidates[0].content.parts[0].text;
+      const parts = result.candidates[0].content.parts;
+      const textPart = parts.find(p => !p.thought && p.text) || parts[0];
+      const aiAnalysis = (textPart && textPart.text) ? textPart.text : '';
       const marketEmoji = (targetMarket === 'TW') ? '🇹🇼' : (targetMarket === 'Crypto' ? '₿' : '🇺🇸');
 
       const message = {
@@ -621,20 +628,31 @@ function generateMorningBriefing(targetMarket) {
 ${JSON.stringify(newsContext, null, 2)}
 `;
 
-  const payload = { contents: [{ parts: [{ text: prompt }] }], generationConfig: { temperature: 0.1 } }; 
+  const payload = {
+    contents: [{ parts: [{ text: prompt }] }],
+    generationConfig: {
+      temperature: 0.1,
+      thinkingConfig: {
+        thinkingLevel: 'low' // 限制思考延遲，防止 GAS 請求逾時卡住 (支援免費額度)
+      }
+    }
+  };
   const options = { method: 'post', contentType: 'application/json', payload: JSON.stringify(payload), muteHttpExceptions: true };
 
   try {
     const response = UrlFetchApp.fetch(url, options);
     const result = JSON.parse(response.getContentText());
-    
+
     if (result.candidates && result.candidates.length > 0) {
+      const parts = result.candidates[0].content.parts;
+      const textPart = parts.find(p => !p.thought && p.text) || parts[0];
+      const briefingText = (textPart && textPart.text) ? textPart.text : '';
       const marketEmoji = (targetMarket === 'TW') ? '🇹🇼' : (targetMarket === 'Crypto' ? '₿' : '🇺🇸');
       const message = {
         "content": null,
         "embeds": [{
           "title": `${marketEmoji} Agent ${targetMarket} 盤前新聞早報`,
-          "description": result.candidates[0].content.parts[0].text,
+          "description": briefingText,
           "color": 16766720, 
           "footer": { "text": `Powered by Google News RSS & Gemini Agent (${CONFIG.geminiModel})` },
           "timestamp": new Date().toISOString()

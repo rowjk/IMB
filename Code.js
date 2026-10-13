@@ -1050,6 +1050,42 @@ function fetchYahooFallback(symbol, market) {
   }
 }
 
+/**
+ * 試算表自訂函數：取得股票現價 (供儲存格公式備援使用)
+ * 使用方式：
+ *   =IFERROR(GOOGLEFINANCE(A2, "price"), GET_PRICE(A2, B2))
+ * 或直接使用：
+ *   =GET_PRICE(A2, B2)
+ *
+ * @param {string} symbol 股票代號 (如 "0050", "TPE:0050", "VOO")
+ * @param {string} market 市場分類 (如 "TW", "US", "Crypto")
+ * @return {number} 最新股價
+ * @customfunction
+ */
+function GET_PRICE(symbol, market) {
+  if (!symbol) return "";
+  const data = fetchYahooFallback(String(symbol), market || 'TW');
+  return (data && typeof data.currentPrice === 'number') ? data.currentPrice : "#N/A";
+}
+
+/**
+ * 試算表自訂函數：取得股票單日漲跌幅 (小數點，如 0.015 代表 +1.5%)
+ * 使用方式：
+ *   =IFERROR(GOOGLEFINANCE(A2, "changepct")/100, GET_CHANGE(A2, B2))
+ * 或直接使用：
+ *   =GET_CHANGE(A2, B2)
+ *
+ * @param {string} symbol 股票代號
+ * @param {string} market 市場分類 (如 "TW", "US", "Crypto")
+ * @return {number} 單日漲跌幅
+ * @customfunction
+ */
+function GET_CHANGE(symbol, market) {
+  if (!symbol) return "";
+  const data = fetchYahooFallback(String(symbol), market || 'TW');
+  return (data && typeof data.dayChangePct === 'number') ? data.dayChangePct : "#N/A";
+}
+
 // 用於獨立測試 Yahoo Finance API 備援機制的測試函數
 function testYahooFallback() {
   Logger.log("========= [Yahoo Finance 備援測試開始] =========");
